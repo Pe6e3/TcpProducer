@@ -3,6 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<base href="/tcp/">
 	<title>TcpProducer Admin</title>
 	<link rel="stylesheet" href="styles.css">
 </head>
@@ -39,6 +40,18 @@
 				<button id="clearBtn" class="btn btn-secondary btn-sm" type="button">Очистить</button>
 			</div>
 			<pre id="output" class="output">Готово.</pre>
+		</section>
+
+		<section class="card">
+			<div class="card-head">
+				<h2>Логи сервиса</h2>
+				<div class="actions">
+					<button id="logsStartBtn" class="btn btn-success btn-sm" type="button">Смотреть онлайн</button>
+					<button id="logsStopBtn" class="btn btn-danger btn-sm" type="button" disabled>Стоп</button>
+					<button id="logsClearBtn" class="btn btn-secondary btn-sm" type="button">Очистить</button>
+				</div>
+			</div>
+			<pre id="logsOutput" class="output logs-output">Нажмите «Смотреть онлайн».</pre>
 		</section>
 	</div>
 

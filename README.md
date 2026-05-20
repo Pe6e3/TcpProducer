@@ -64,7 +64,11 @@ systemctl restart tcpproducer-admin
 ```
 
 
-## Смотреть логи онлайн
+## Логи
+
+В панели **https://антон.su/tcp/** — блок «Логи сервиса» → **Смотреть онлайн** (SSE-поток `journalctl -u tcpproducer -f`).
+
+В терминале:
 ```bash
 journalctl -u tcpproducer -f
 ```

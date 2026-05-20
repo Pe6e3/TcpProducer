@@ -185,6 +185,15 @@ input:focus {
 	word-break: break-word;
 }
 
+.logs-output {
+	min-height: 360px;
+	max-height: 480px;
+}
+
+.card-head .actions {
+	margin: 0;
+}
+
 @media (max-width: 640px) {
 	.header {
 		flex-direction: column;

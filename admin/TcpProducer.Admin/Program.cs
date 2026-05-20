@@ -94,6 +94,22 @@ public static class Program
 			});
 		});
 
+		app.MapGet("/api/logs/stream", async (HttpContext context, CancellationToken ct) =>
+		{
+			context.Response.Headers.CacheControl = "no-cache, no-store";
+			context.Response.Headers.Connection = "keep-alive";
+			context.Response.ContentType = "text/event-stream";
+
+			await context.Response.StartAsync(ct);
+
+			await foreach (var line in LogStreamer.StreamServiceLogsAsync(ct))
+			{
+				var payload = LogStreamer.FormatSseEvent(line);
+				await context.Response.WriteAsync(payload, ct);
+				await context.Response.Body.FlushAsync(ct);
+			}
+		});
+
 		app.Run("http://127.0.0.1:8770");
 	}
 }

@@ -1,5 +1,12 @@
 const TOKEN_KEY = 'tcpproducer_admin_token';
 
+// Панель на https://антон.su/tcp/ — API не в корне домена
+const API_BASE = window.location.pathname.startsWith('/tcp') ? '/tcp' : '';
+
+function apiUrl(path) {
+	return `${API_BASE}${path}`;
+}
+
 const tokenInput = document.getElementById('tokenInput');
 const saveTokenBtn = document.getElementById('saveTokenBtn');
 const statusBtn = document.getElementById('statusBtn');
@@ -7,8 +14,14 @@ const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
 const deployBtn = document.getElementById('deployBtn');
 const clearBtn = document.getElementById('clearBtn');
+const logsStartBtn = document.getElementById('logsStartBtn');
+const logsStopBtn = document.getElementById('logsStopBtn');
+const logsClearBtn = document.getElementById('logsClearBtn');
 const output = document.getElementById('output');
+const logsOutput = document.getElementById('logsOutput');
 const statusBadge = document.getElementById('statusBadge');
+
+let logsAbortController = null;
 
 const buttons = [statusBtn, startBtn, stopBtn, deployBtn];
 
@@ -34,7 +47,7 @@ async function apiRequest(path, method = 'GET') {
 		throw new Error('no token');
 	}
 
-	const response = await fetch(path, {
+	const response = await fetch(apiUrl(path), {
 		method,
 		headers: {
 			Authorization: `Bearer ${token}`,
@@ -126,6 +139,100 @@ stopBtn.addEventListener('click', () => runAction('Остановка серви
 deployBtn.addEventListener('click', () => runAction('Деплой', '/api/deploy').catch(() => {}));
 clearBtn.addEventListener('click', () => {
 	output.textContent = 'Готово.';
+});
+
+function appendLogLine(text) {
+	logsOutput.textContent += `${text}\n`;
+	logsOutput.scrollTop = logsOutput.scrollHeight;
+}
+
+function setLogsStreaming(isStreaming) {
+	logsStartBtn.disabled = isStreaming;
+	logsStopBtn.disabled = !isStreaming;
+}
+
+function stopLogs() {
+	if (logsAbortController) {
+		logsAbortController.abort();
+		logsAbortController = null;
+	}
+
+	setLogsStreaming(false);
+}
+
+async function startLogs() {
+	const token = getToken();
+	if (!token) {
+		logsOutput.textContent = 'Сначала сохраните API-токен.';
+		return;
+	}
+
+	stopLogs();
+	logsOutput.textContent = 'Подключение к потоку логов…\n';
+	setLogsStreaming(true);
+
+	logsAbortController = new AbortController();
+
+	try {
+		const response = await fetch(apiUrl('/api/logs/stream'), {
+			headers: { Authorization: `Bearer ${token}` },
+			signal: logsAbortController.signal,
+		});
+
+		if (response.status === 401) {
+			logsOutput.textContent = 'Ошибка авторизации. Проверьте ADMIN_API_TOKEN.';
+			return;
+		}
+
+		if (!response.ok) {
+			logsOutput.textContent = `Ошибка подключения: HTTP ${response.status}`;
+			return;
+		}
+
+		logsOutput.textContent = '--- логи tcpproducer ---\n';
+
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = '';
+
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done)
+				break;
+
+			buffer += decoder.decode(value, { stream: true });
+			const events = buffer.split('\n\n');
+			buffer = events.pop() || '';
+
+			for (const event of events) {
+				const line = event
+					.split('\n')
+					.filter((row) => row.startsWith('data: '))
+					.map((row) => row.slice(6))
+					.join('\n');
+
+				if (line)
+					appendLogLine(line);
+			}
+		}
+
+		appendLogLine('--- поток завершён ---');
+	} catch (err) {
+		if (err.name !== 'AbortError')
+			appendLogLine(`Ошибка: ${err.message}`);
+	} finally {
+		setLogsStreaming(false);
+		logsAbortController = null;
+	}
+}
+
+logsStartBtn.addEventListener('click', () => startLogs());
+logsStopBtn.addEventListener('click', () => {
+	stopLogs();
+	appendLogLine('--- остановлено пользователем ---');
+});
+logsClearBtn.addEventListener('click', () => {
+	logsOutput.textContent = 'Нажмите «Смотреть онлайн».';
 });
 
 const savedToken = getToken();
