@@ -11,11 +11,9 @@ const tokenCard = document.getElementById('tokenCard');
 const tokenInput = document.getElementById('tokenInput');
 const saveTokenBtn = document.getElementById('saveTokenBtn');
 const powerToggle = document.getElementById('powerToggle');
-const clearBtn = document.getElementById('clearBtn');
 const logsStartBtn = document.getElementById('logsStartBtn');
 const logsStopBtn = document.getElementById('logsStopBtn');
 const logsClearBtn = document.getElementById('logsClearBtn');
-const output = document.getElementById('output');
 const logsOutput = document.getElementById('logsOutput');
 const packetCount = document.getElementById('packetCount');
 const packetCount60 = document.getElementById('packetCount60');
@@ -103,18 +101,15 @@ async function toggleService() {
 	if (serviceToggleBusy || !getToken())
 		return;
 
-	const label = serviceIsRunning ? 'Остановка сервиса' : 'Запуск сервиса';
 	const path = serviceIsRunning ? '/api/stop' : '/api/start';
 
-	appendOutput(`${label}…`);
 	setPowerToggleLoading(true);
 
 	try {
-		const data = await apiRequest(path, 'POST');
-		appendOutput(data.output || (data.ok ? 'OK' : 'Ошибка'));
+		await apiRequest(path, 'POST');
 		await refreshServiceStatus();
 	} catch {
-		// ошибка уже в output
+		// ошибка показана в showError
 	} finally {
 		setPowerToggleLoading(false);
 		updateServiceToggle({ isRunning: serviceIsRunning });
@@ -137,12 +132,12 @@ function toggleDevicesPanel() {
 async function saveToken() {
 	const token = tokenInput.value.trim();
 	if (!token) {
-		appendOutput('Введите API-токен.');
+		showError('Введите API-токен.');
 		return;
 	}
 
 	if (!await validateToken(token)) {
-		appendOutput('Неверный API-токен.');
+		showError('Неверный API-токен.');
 		return;
 	}
 
@@ -150,7 +145,6 @@ async function saveToken() {
 	setTokenCardVisible(false);
 	configCard.hidden = false;
 	powerToggle.disabled = false;
-	appendOutput('Токен сохранён.');
 	startStatsStream();
 	startStatusPolling();
 	loadConfig().catch(() => {});
@@ -195,7 +189,6 @@ async function saveSerials() {
 		const result = await apiRequest('/api/serials?restart=true', 'PUT', {
 			content: serialsContent.value,
 		});
-		appendOutput(result.message || 'Сохранено');
 		updateSerialsLineCount(
 			serialsContent.value
 				.split(/\r?\n/)
@@ -204,7 +197,7 @@ async function saveSerials() {
 		);
 		await refreshServiceStatus();
 	} catch {
-		// ошибка в output
+		// ошибка показана в showError
 	} finally {
 		serialsSaveBtn.disabled = false;
 	}
@@ -222,10 +215,9 @@ async function saveConfig() {
 	configSaveBtn.disabled = true;
 	try {
 		const result = await apiRequest('/api/config?restart=true', 'PUT', collectConfigForm());
-		appendOutput(result.message || 'Сохранено');
 		await refreshServiceStatus();
 	} catch {
-		// ошибка в output
+		// ошибка показана в showError
 	} finally {
 		configSaveBtn.disabled = false;
 	}
@@ -241,7 +233,7 @@ powerToggle.addEventListener('click', () => toggleService().catch(() => {}));
 async function apiRequest(path, method = 'GET', body = null) {
 	const token = getToken();
 	if (!token) {
-		appendOutput('Сначала сохраните API-токен.');
+		showError('Сначала сохраните API-токен.');
 		throw new Error('no token');
 	}
 
@@ -264,21 +256,20 @@ async function apiRequest(path, method = 'GET', body = null) {
 		powerToggle.disabled = true;
 		powerToggle.classList.remove('is-on', 'is-off');
 		powerToggle.classList.add('is-off');
-		appendOutput('Ошибка авторизации. Введите API-токен заново.');
+		showError('Ошибка авторизации. Введите API-токен заново.');
 		throw new Error('unauthorized');
 	}
 
 	if (!response.ok) {
-		appendOutput(data.error || `HTTP ${response.status}`);
+		showError(data.error || `HTTP ${response.status}`);
 		throw new Error('request failed');
 	}
 
 	return data;
 }
 
-function appendOutput(text) {
-	const stamp = new Date().toLocaleTimeString('ru-RU');
-	output.textContent = `[${stamp}] ${text}\n\n${output.textContent}`.trim();
+function showError(text) {
+	alert(text);
 }
 
 function formatPacketCount(value) {
@@ -427,9 +418,6 @@ async function startStatsStream() {
 }
 
 saveTokenBtn.addEventListener('click', saveToken);
-clearBtn.addEventListener('click', () => {
-	output.textContent = 'Готово.';
-});
 
 function appendLogLine(text) {
 	logsOutput.textContent += `${text}\n`;
