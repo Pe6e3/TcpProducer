@@ -29,4 +29,6 @@ Thumbs.db
 appsettings.*.json
 !appsettings.json
 .env
+publish/stats.json
+publish/stats.json.tmp
 publish/

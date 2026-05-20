@@ -49,6 +49,7 @@ public sealed class TcpSession : IAsyncDisposable
 
 		await _stream.WriteAsync(payload, cancellationToken);
 		await _stream.FlushAsync(cancellationToken);
+		PacketStats.RecordSent();
 
 		if (_tcp.AppendNewline)
 		{

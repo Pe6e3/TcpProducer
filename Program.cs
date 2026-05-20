@@ -24,5 +24,7 @@ Console.InputEncoding = System.Text.Encoding.UTF8;
 
 void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
 
+PacketStats.StartPersistence(cts.Token);
+
 await using var host = new SealSimulatorHost(options, store: null, Log);
 await host.RunAsync(cts.Token);

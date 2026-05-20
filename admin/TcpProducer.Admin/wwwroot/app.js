@@ -20,8 +20,10 @@ const logsClearBtn = document.getElementById('logsClearBtn');
 const output = document.getElementById('output');
 const logsOutput = document.getElementById('logsOutput');
 const statusBadge = document.getElementById('statusBadge');
+const packetCount = document.getElementById('packetCount');
 
 let logsAbortController = null;
+let statsAbortController = null;
 
 const buttons = [statusBtn, startBtn, stopBtn, deployBtn];
 
@@ -38,6 +40,7 @@ function saveToken() {
 
 	sessionStorage.setItem(TOKEN_KEY, token);
 	appendOutput('Токен сохранён в sessionStorage.');
+	startStatsStream();
 }
 
 async function apiRequest(path, method = 'GET') {
@@ -88,6 +91,96 @@ function updateBadgeFromStatus(data) {
 function appendOutput(text) {
 	const stamp = new Date().toLocaleTimeString('ru-RU');
 	output.textContent = `[${stamp}] ${text}\n\n${output.textContent}`.trim();
+}
+
+function formatPacketCount(value) {
+	return new Intl.NumberFormat('ru-RU').format(value);
+}
+
+function applyStats(data) {
+	packetCount.textContent = formatPacketCount(data.totalSent ?? 0);
+	packetCount.title = data.available
+		? `Обновлено: ${data.updatedAt ? new Date(data.updatedAt).toLocaleString('ru-RU') : '—'}`
+		: 'Сервис не запущен или stats.json ещё не создан';
+}
+
+async function consumeSseStream(path, onEvent, signal) {
+	const token = getToken();
+	if (!token)
+		throw new Error('no token');
+
+	const response = await fetch(apiUrl(path), {
+		headers: { Authorization: `Bearer ${token}` },
+		signal,
+	});
+
+	if (response.status === 401)
+		throw new Error('unauthorized');
+
+	if (!response.ok)
+		throw new Error(`HTTP ${response.status}`);
+
+	const reader = response.body.getReader();
+	const decoder = new TextDecoder();
+	let buffer = '';
+
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done)
+			break;
+
+		buffer += decoder.decode(value, { stream: true });
+		const events = buffer.split('\n\n');
+		buffer = events.pop() || '';
+
+		for (const event of events) {
+			const data = event
+				.split('\n')
+				.filter((row) => row.startsWith('data: '))
+				.map((row) => row.slice(6))
+				.join('\n');
+
+			if (data)
+				onEvent(data);
+		}
+	}
+}
+
+function stopStatsStream() {
+	if (statsAbortController) {
+		statsAbortController.abort();
+		statsAbortController = null;
+	}
+}
+
+async function startStatsStream() {
+	const token = getToken();
+	if (!token) {
+		packetCount.textContent = '—';
+		return;
+	}
+
+	stopStatsStream();
+	statsAbortController = new AbortController();
+
+	try {
+		await consumeSseStream(
+			'/api/stats/stream',
+			(raw) => {
+				try {
+					applyStats(JSON.parse(raw));
+				} catch {
+					// пропуск битого события
+				}
+			},
+			statsAbortController.signal,
+		);
+	} catch (err) {
+		if (err.name !== 'AbortError')
+			packetCount.textContent = '—';
+	} finally {
+		statsAbortController = null;
+	}
 }
 
 async function loadStatus(silent = false) {
@@ -174,50 +267,14 @@ async function startLogs() {
 	logsAbortController = new AbortController();
 
 	try {
-		const response = await fetch(apiUrl('/api/logs/stream'), {
-			headers: { Authorization: `Bearer ${token}` },
-			signal: logsAbortController.signal,
-		});
-
-		if (response.status === 401) {
+		logsOutput.textContent = '--- логи tcpproducer ---\n';
+		await consumeSseStream('/api/logs/stream', (line) => appendLogLine(line), logsAbortController.signal);
+		appendLogLine('--- поток завершён ---');
+	} catch (err) {
+		if (err.message === 'unauthorized') {
 			logsOutput.textContent = 'Ошибка авторизации. Проверьте ADMIN_API_TOKEN.';
 			return;
 		}
-
-		if (!response.ok) {
-			logsOutput.textContent = `Ошибка подключения: HTTP ${response.status}`;
-			return;
-		}
-
-		logsOutput.textContent = '--- логи tcpproducer ---\n';
-
-		const reader = response.body.getReader();
-		const decoder = new TextDecoder();
-		let buffer = '';
-
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done)
-				break;
-
-			buffer += decoder.decode(value, { stream: true });
-			const events = buffer.split('\n\n');
-			buffer = events.pop() || '';
-
-			for (const event of events) {
-				const line = event
-					.split('\n')
-					.filter((row) => row.startsWith('data: '))
-					.map((row) => row.slice(6))
-					.join('\n');
-
-				if (line)
-					appendLogLine(line);
-			}
-		}
-
-		appendLogLine('--- поток завершён ---');
-	} catch (err) {
 		if (err.name !== 'AbortError')
 			appendLogLine(`Ошибка: ${err.message}`);
 	} finally {
@@ -240,5 +297,6 @@ if (savedToken)
 	tokenInput.value = savedToken;
 
 if (savedToken) {
+	startStatsStream();
 	loadStatus(true).catch(() => {});
 }

@@ -58,6 +58,24 @@ public static class Program
 
 		app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
+		app.MapGet("/api/stats", async (CancellationToken ct) =>
+			Results.Ok(await StatsReader.ReadAsync(ct)));
+
+		app.MapGet("/api/stats/stream", async (HttpContext context, CancellationToken ct) =>
+		{
+			context.Response.Headers.CacheControl = "no-cache, no-store";
+			context.Response.Headers.Connection = "keep-alive";
+			context.Response.ContentType = "text/event-stream";
+
+			await context.Response.StartAsync(ct);
+
+			await foreach (var payload in StatsStreamer.StreamAsync(ct))
+			{
+				await context.Response.WriteAsync(payload, ct);
+				await context.Response.Body.FlushAsync(ct);
+			}
+		});
+
 		app.MapGet("/api/status", async (CancellationToken ct) =>
 		{
 			var status = await ServiceManager.GetStatusAsync(ct);
