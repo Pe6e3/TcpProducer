@@ -32,7 +32,8 @@ public sealed class SealSimulatorHost : IAsyncDisposable
 	public async Task RunAsync(CancellationToken cancellationToken)
 	{
 		var seals = ResolveSeals();
-		_log($"пломб: {seals.Count} | storage: {_options.Storage.Provider} | session {_options.Device.SessionDuration}");
+		var maxInfo = _options.Device.MaxDevices > 0 ? $" (лимит {_options.Device.MaxDevices})" : "";
+		_log($"пломб: {seals.Count}{maxInfo} | storage: {_options.Storage.Provider} | session {_options.Device.SessionDuration}");
 
 		await StartAllDevicesStaggeredAsync(seals, cancellationToken);
 	}
@@ -101,13 +102,15 @@ public sealed class SealSimulatorHost : IAsyncDisposable
 	{
 		if (_options.Seals.Count > 0)
 		{
-			return _options.Seals
+			var fromConfig = _options.Seals
 				.Where(s => !string.IsNullOrWhiteSpace(s.SerialNumber))
 				.Select(s => new SealRuntimeConfig(
 					s.SerialNumber,
 					s.ConnectInterval ?? _options.Device.ConnectInterval,
 					s.PacketInterval ?? _options.Device.PacketInterval))
 				.ToList();
+
+			return LimitDevices(fromConfig);
 		}
 
 		var path = SealSerialNumbersLoader.ResolvePath(
@@ -118,12 +121,22 @@ public sealed class SealSimulatorHost : IAsyncDisposable
 		if (serials.Count == 0)
 			throw new InvalidOperationException($"В файле {_options.Device.SerialNumbersFile} нет серийных номеров");
 
-		return serials
+		var seals = serials
 			.Select(sn => new SealRuntimeConfig(
 				sn,
 				_options.Device.ConnectInterval,
 				_options.Device.PacketInterval))
 			.ToList();
+
+		return LimitDevices(seals);
+	}
+
+	List<SealRuntimeConfig> LimitDevices(List<SealRuntimeConfig> seals)
+	{
+		if (_options.Device.MaxDevices > 0 && seals.Count > _options.Device.MaxDevices)
+			return seals.Take(_options.Device.MaxDevices).ToList();
+
+		return seals;
 	}
 
 	public async ValueTask DisposeAsync()

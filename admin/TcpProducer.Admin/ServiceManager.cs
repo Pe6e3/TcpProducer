@@ -73,6 +73,9 @@ public static class ServiceManager
 	public static Task<CommandResult> StopAsync(CancellationToken cancellationToken = default) =>
 		Runner.RunAsync("systemctl", $"stop {AdminOptions.ServiceName}", cancellationToken: cancellationToken);
 
+	public static Task<CommandResult> RestartAsync(CancellationToken cancellationToken = default) =>
+		Runner.RunAsync("systemctl", $"restart {AdminOptions.ServiceName}", cancellationToken: cancellationToken);
+
 	public static Task<CommandResult> DeployAsync(CancellationToken cancellationToken = default) =>
 		Runner.DeployAsync(cancellationToken);
 

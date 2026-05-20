@@ -76,6 +76,56 @@ public static class Program
 			}
 		});
 
+		app.MapGet("/api/config", async (CancellationToken ct) =>
+		{
+			try
+			{
+				return Results.Ok(await AppConfigService.ReadEditableAsync(ct));
+			}
+			catch (Exception ex)
+			{
+				return Results.BadRequest(new { error = ex.Message });
+			}
+		});
+
+		app.MapGet("/api/serials", async (CancellationToken ct) =>
+		{
+			try
+			{
+				return Results.Ok(await SerialsFileService.ReadAsync(ct));
+			}
+			catch (Exception ex)
+			{
+				return Results.BadRequest(new { error = ex.Message });
+			}
+		});
+
+		app.MapPut("/api/serials", async (SerialsSaveRequest request, bool restart, CancellationToken ct) =>
+		{
+			try
+			{
+				var result = await SerialsFileService.SaveAsync(request.Content, restart, ct);
+				return result.Ok ? Results.Ok(result) : Results.BadRequest(result);
+			}
+			catch (Exception ex)
+			{
+				return Results.BadRequest(new { ok = false, message = ex.Message });
+			}
+		});
+
+		app.MapPut("/api/config", async (EditableConfigDto config, bool restart, CancellationToken ct) =>
+		{
+			try
+			{
+				var result = await AppConfigService.SaveAsync(config, restart, ct);
+				return result.Ok ? Results.Ok(result) : Results.BadRequest(result);
+			}
+			catch (Exception ex)
+			{
+				return Results.BadRequest(new { ok = false, message = ex.Message });
+			}
+		});
+
 		app.MapGet("/api/status", async (CancellationToken ct) =>
 		{
 			var status = await ServiceManager.GetStatusAsync(ct);

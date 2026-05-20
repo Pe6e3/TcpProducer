@@ -5,6 +5,8 @@ public sealed class DeviceOptions
 	public const string SectionName = "Device";
 
 	public string SerialNumbersFile { get; set; } = "deviceserials.txt";
+	/// <summary>Максимум устройств из файла (0 = все).</summary>
+	public int MaxDevices { get; set; }
 	public string SerialNumber { get; set; } = "";
 	/// <summary>Период между выходами на связь (время «сна» и накопления очереди).</summary>
 	public TimeSpan ConnectInterval { get; set; } = TimeSpan.FromMinutes(10);

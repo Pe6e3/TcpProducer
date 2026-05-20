@@ -7,62 +7,264 @@ function apiUrl(path) {
 	return `${API_BASE}${path}`;
 }
 
+const tokenCard = document.getElementById('tokenCard');
 const tokenInput = document.getElementById('tokenInput');
 const saveTokenBtn = document.getElementById('saveTokenBtn');
-const statusBtn = document.getElementById('statusBtn');
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const deployBtn = document.getElementById('deployBtn');
+const powerToggle = document.getElementById('powerToggle');
 const clearBtn = document.getElementById('clearBtn');
 const logsStartBtn = document.getElementById('logsStartBtn');
 const logsStopBtn = document.getElementById('logsStopBtn');
 const logsClearBtn = document.getElementById('logsClearBtn');
 const output = document.getElementById('output');
 const logsOutput = document.getElementById('logsOutput');
-const statusBadge = document.getElementById('statusBadge');
 const packetCount = document.getElementById('packetCount');
 const packetCount60 = document.getElementById('packetCount60');
 const packetsChart = document.getElementById('packetsChart');
+const configCard = document.getElementById('configCard');
+const serialsPanel = document.getElementById('serialsPanel');
+const toggleDevicesBtn = document.getElementById('toggleDevicesBtn');
+const configReloadBtn = document.getElementById('configReloadBtn');
+const configSaveBtn = document.getElementById('configSaveBtn');
+const serialsReloadBtn = document.getElementById('serialsReloadBtn');
+const serialsSaveBtn = document.getElementById('serialsSaveBtn');
+const serialsContent = document.getElementById('serialsContent');
+const serialsLineCount = document.getElementById('serialsLineCount');
 
 let logsAbortController = null;
 let statsAbortController = null;
-
-const buttons = [statusBtn, startBtn, stopBtn, deployBtn];
+let statusPollTimer = null;
+let serviceIsRunning = false;
+let serviceToggleBusy = false;
+let serialsLoaded = false;
+let devicesPanelVisible = false;
 
 function getToken() {
 	return sessionStorage.getItem(TOKEN_KEY) || '';
 }
 
-function saveToken() {
+function setTokenCardVisible(visible) {
+	tokenCard.hidden = !visible;
+}
+
+async function validateToken(token = getToken()) {
+	if (!token)
+		return false;
+
+	try {
+		const response = await fetch(apiUrl('/api/status'), {
+			headers: { Authorization: `Bearer ${token}` },
+		});
+		return response.ok;
+	} catch {
+		return false;
+	}
+}
+
+function stopStatusPolling() {
+	if (statusPollTimer) {
+		clearInterval(statusPollTimer);
+		statusPollTimer = null;
+	}
+}
+
+function startStatusPolling() {
+	stopStatusPolling();
+	refreshServiceStatus().catch(() => {});
+	statusPollTimer = setInterval(() => refreshServiceStatus().catch(() => {}), 5000);
+}
+
+function setPowerToggleLoading(isLoading) {
+	serviceToggleBusy = isLoading;
+	powerToggle.disabled = isLoading || !getToken();
+	powerToggle.classList.toggle('is-loading', isLoading);
+	if (isLoading)
+		powerToggle.classList.remove('is-on', 'is-off');
+}
+
+function updateServiceToggle(data) {
+	serviceIsRunning = !!data.isRunning;
+	powerToggle.classList.toggle('is-on', data.isRunning);
+	powerToggle.classList.toggle('is-off', !data.isRunning);
+	powerToggle.setAttribute('aria-pressed', String(data.isRunning));
+	powerToggle.title = data.isRunning
+		? 'Сервис работает — нажмите для остановки'
+		: 'Сервис остановлен — нажмите для запуска';
+	if (!serviceToggleBusy)
+		powerToggle.disabled = !getToken();
+}
+
+async function refreshServiceStatus() {
+	const data = await apiRequest('/api/status');
+	updateServiceToggle(data);
+	return data;
+}
+
+async function toggleService() {
+	if (serviceToggleBusy || !getToken())
+		return;
+
+	const label = serviceIsRunning ? 'Остановка сервиса' : 'Запуск сервиса';
+	const path = serviceIsRunning ? '/api/stop' : '/api/start';
+
+	appendOutput(`${label}…`);
+	setPowerToggleLoading(true);
+
+	try {
+		const data = await apiRequest(path, 'POST');
+		appendOutput(data.output || (data.ok ? 'OK' : 'Ошибка'));
+		await refreshServiceStatus();
+	} catch {
+		// ошибка уже в output
+	} finally {
+		setPowerToggleLoading(false);
+		updateServiceToggle({ isRunning: serviceIsRunning });
+	}
+}
+
+function toggleDevicesPanel() {
+	devicesPanelVisible = !devicesPanelVisible;
+	serialsPanel.hidden = !devicesPanelVisible;
+	toggleDevicesBtn.classList.toggle('btn-active', devicesPanelVisible);
+
+	if (devicesPanelVisible && !serialsLoaded)
+		loadSerials()
+			.then(() => {
+				serialsLoaded = true;
+			})
+			.catch(() => {});
+}
+
+async function saveToken() {
 	const token = tokenInput.value.trim();
 	if (!token) {
 		appendOutput('Введите API-токен.');
 		return;
 	}
 
+	if (!await validateToken(token)) {
+		appendOutput('Неверный API-токен.');
+		return;
+	}
+
 	sessionStorage.setItem(TOKEN_KEY, token);
-	appendOutput('Токен сохранён в sessionStorage.');
+	setTokenCardVisible(false);
+	configCard.hidden = false;
+	powerToggle.disabled = false;
+	appendOutput('Токен сохранён.');
 	startStatsStream();
+	startStatusPolling();
+	loadConfig().catch(() => {});
 }
 
-async function apiRequest(path, method = 'GET') {
+function fillConfigForm(config) {
+	const d = config.device || {};
+
+	document.getElementById('cfgMaxDevices').value = d.maxDevices ?? 0;
+	document.getElementById('cfgConnectInterval').value = d.connectInterval || '';
+	document.getElementById('cfgPacketInterval').value = d.packetInterval || '';
+	document.getElementById('cfgSessionDuration').value = d.sessionDuration || '';
+}
+
+function collectConfigForm() {
+	return {
+		device: {
+			maxDevices: Number(document.getElementById('cfgMaxDevices').value),
+			connectInterval: document.getElementById('cfgConnectInterval').value.trim(),
+			packetInterval: document.getElementById('cfgPacketInterval').value.trim(),
+			sessionDuration: document.getElementById('cfgSessionDuration').value.trim(),
+		},
+	};
+}
+
+function updateSerialsLineCount(count) {
+	serialsLineCount.textContent = `${count} в файле`;
+}
+
+async function loadSerials() {
+	const data = await apiRequest('/api/serials');
+	serialsContent.value = data.content || '';
+	updateSerialsLineCount(data.lineCount ?? 0);
+}
+
+async function saveSerials() {
+	if (!confirm('Сохранить deviceserials.txt и перезапустить tcpproducer?'))
+		return;
+
+	serialsSaveBtn.disabled = true;
+	try {
+		const result = await apiRequest('/api/serials?restart=true', 'PUT', {
+			content: serialsContent.value,
+		});
+		appendOutput(result.message || 'Сохранено');
+		updateSerialsLineCount(
+			serialsContent.value
+				.split(/\r?\n/)
+				.filter((l) => l.trim() && !l.trim().startsWith('#'))
+				.length,
+		);
+		await refreshServiceStatus();
+	} catch {
+		// ошибка в output
+	} finally {
+		serialsSaveBtn.disabled = false;
+	}
+}
+
+async function loadConfig() {
+	const config = await apiRequest('/api/config');
+	fillConfigForm(config);
+}
+
+async function saveConfig() {
+	if (!confirm('Сохранить appsettings.json и перезапустить tcpproducer?'))
+		return;
+
+	configSaveBtn.disabled = true;
+	try {
+		const result = await apiRequest('/api/config?restart=true', 'PUT', collectConfigForm());
+		appendOutput(result.message || 'Сохранено');
+		await refreshServiceStatus();
+	} catch {
+		// ошибка в output
+	} finally {
+		configSaveBtn.disabled = false;
+	}
+}
+
+configReloadBtn.addEventListener('click', () => loadConfig().catch(() => {}));
+configSaveBtn.addEventListener('click', () => saveConfig().catch(() => {}));
+toggleDevicesBtn.addEventListener('click', toggleDevicesPanel);
+serialsReloadBtn.addEventListener('click', () => loadSerials().catch(() => {}));
+serialsSaveBtn.addEventListener('click', () => saveSerials().catch(() => {}));
+powerToggle.addEventListener('click', () => toggleService().catch(() => {}));
+
+async function apiRequest(path, method = 'GET', body = null) {
 	const token = getToken();
 	if (!token) {
 		appendOutput('Сначала сохраните API-токен.');
 		throw new Error('no token');
 	}
 
+	const headers = { Authorization: `Bearer ${token}` };
+	if (body !== null)
+		headers['Content-Type'] = 'application/json';
+
 	const response = await fetch(apiUrl(path), {
 		method,
-		headers: {
-			Authorization: `Bearer ${token}`,
-		},
+		headers,
+		body: body !== null ? JSON.stringify(body) : undefined,
 	});
 
 	const data = await response.json().catch(() => ({}));
 
 	if (response.status === 401) {
-		appendOutput('Ошибка авторизации. Проверьте ADMIN_API_TOKEN.');
+		sessionStorage.removeItem(TOKEN_KEY);
+		setTokenCardVisible(true);
+		stopStatusPolling();
+		powerToggle.disabled = true;
+		powerToggle.classList.remove('is-on', 'is-off');
+		powerToggle.classList.add('is-off');
+		appendOutput('Ошибка авторизации. Введите API-токен заново.');
 		throw new Error('unauthorized');
 	}
 
@@ -72,22 +274,6 @@ async function apiRequest(path, method = 'GET') {
 	}
 
 	return data;
-}
-
-function setLoading(isLoading) {
-	buttons.forEach((btn) => {
-		btn.disabled = isLoading;
-	});
-
-	statusBadge.textContent = isLoading ? 'Загрузка…' : statusBadge.dataset.label || '—';
-	statusBadge.className = `status-badge${isLoading ? ' loading' : ''}`;
-}
-
-function updateBadgeFromStatus(data) {
-	const label = data.isRunning ? 'Работает' : `${data.activeState} / ${data.subState}`;
-	statusBadge.dataset.label = label;
-	statusBadge.textContent = label;
-	statusBadge.className = `status-badge${data.isRunning ? ' running' : ' stopped'}`;
 }
 
 function appendOutput(text) {
@@ -112,12 +298,13 @@ function renderPacketsChart(timeline) {
 	);
 
 	const bars = timeline
-		.map((point) => {
+		.map((point, index) => {
 			const count = point.count ?? 0;
 			const height = Math.round((count / max) * 100);
 			const label = point.label || '';
+			const barClass = index === lastIndex ? 'chart-bar chart-bar-current' : 'chart-bar';
 			return `<div class="chart-bar-wrap" title="${label}: ${formatPacketCount(count)} пакетов">
-				<div class="chart-bar" style="height:${height}%"></div>
+				<div class="${barClass}" style="height:${height}%"></div>
 			</div>`;
 		})
 		.join('');
@@ -161,8 +348,13 @@ async function consumeSseStream(path, onEvent, signal) {
 		signal,
 	});
 
-	if (response.status === 401)
+	if (response.status === 401) {
+		sessionStorage.removeItem(TOKEN_KEY);
+		setTokenCardVisible(true);
+		stopStatusPolling();
+		powerToggle.disabled = true;
 		throw new Error('unauthorized');
+	}
 
 	if (!response.ok)
 		throw new Error(`HTTP ${response.status}`);
@@ -234,53 +426,7 @@ async function startStatsStream() {
 	}
 }
 
-async function loadStatus(silent = false) {
-	if (!silent)
-		appendOutput('Запрос статуса…');
-
-	const data = await apiRequest('/api/status');
-	updateBadgeFromStatus(data);
-
-	if (!silent) {
-		const lines = [
-			`Сервис: ${data.service}`,
-			`Состояние: ${data.activeState} (${data.subState})`,
-			`PID: ${data.mainPid || '—'}`,
-			`С: ${data.activeSince || '—'}`,
-			'',
-			data.raw,
-		];
-		appendOutput(lines.join('\n'));
-	}
-}
-
-async function runAction(label, path) {
-	appendOutput(`${label}…`);
-	setLoading(true);
-
-	try {
-		const data = await apiRequest(path, 'POST');
-		appendOutput(data.output || (data.ok ? 'OK' : 'Ошибка'));
-		await loadStatus(true);
-	} finally {
-		setLoading(false);
-	}
-}
-
 saveTokenBtn.addEventListener('click', saveToken);
-statusBtn.addEventListener('click', async () => {
-	setLoading(true);
-	try {
-		await loadStatus(false);
-	} catch {
-		// ошибка уже в output
-	} finally {
-		setLoading(false);
-	}
-});
-startBtn.addEventListener('click', () => runAction('Запуск сервиса', '/api/start').catch(() => {}));
-stopBtn.addEventListener('click', () => runAction('Остановка сервиса', '/api/stop').catch(() => {}));
-deployBtn.addEventListener('click', () => runAction('Деплой', '/api/deploy').catch(() => {}));
 clearBtn.addEventListener('click', () => {
 	output.textContent = 'Готово.';
 });
@@ -343,11 +489,30 @@ logsClearBtn.addEventListener('click', () => {
 	logsOutput.textContent = 'Нажмите «Смотреть онлайн».';
 });
 
-const savedToken = getToken();
-if (savedToken)
+async function initAuth() {
+	const savedToken = getToken();
+
+	if (!savedToken) {
+		setTokenCardVisible(true);
+		powerToggle.disabled = true;
+		return;
+	}
+
 	tokenInput.value = savedToken;
 
-if (savedToken) {
-	startStatsStream();
-	loadStatus(true).catch(() => {});
+	if (await validateToken(savedToken)) {
+		setTokenCardVisible(false);
+		configCard.hidden = false;
+		powerToggle.disabled = false;
+		startStatsStream();
+		startStatusPolling();
+		loadConfig().catch(() => {});
+		return;
+	}
+
+	sessionStorage.removeItem(TOKEN_KEY);
+	setTokenCardVisible(true);
+	powerToggle.disabled = true;
 }
+
+initAuth();

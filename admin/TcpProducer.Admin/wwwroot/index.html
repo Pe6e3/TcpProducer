@@ -23,15 +23,64 @@
 					<span class="packet-counter-label">Всего</span>
 					<span class="packet-counter-value" id="packetCount">—</span>
 				</div>
-				<div class="status-badge" id="statusBadge">—</div>
+				<button type="button" id="powerToggle" class="power-toggle is-off" aria-pressed="false" title="Сервис остановлен — нажмите для запуска" disabled>
+					<span class="power-toggle-ring"></span>
+				</button>
 			</div>
 		</header>
 
-		<section class="card">
+		<section class="card" id="tokenCard">
 			<label class="label" for="tokenInput">API-токен</label>
 			<div class="token-row">
 				<input id="tokenInput" type="password" placeholder="ADMIN_API_TOKEN из .env" autocomplete="off">
 				<button id="saveTokenBtn" class="btn btn-secondary" type="button">Сохранить</button>
+			</div>
+		</section>
+
+		<section class="card" id="configCard" hidden>
+			<div class="card-head">
+				<h2>Конфигурация</h2>
+				<span class="chart-hint">appsettings.json</span>
+			</div>
+
+			<div class="config-grid">
+				<label class="field">
+					<span class="field-label">Количество устройств</span>
+					<input id="cfgMaxDevices" type="number" min="0" max="50000" title="0 = все из файла">
+				</label>
+				<label class="field">
+					<span class="field-label">Интервал выхода на связь</span>
+					<input id="cfgConnectInterval" type="text" placeholder="01:00:00">
+				</label>
+				<label class="field">
+					<span class="field-label">Интервал пакетов</span>
+					<input id="cfgPacketInterval" type="text" placeholder="01:00:00">
+				</label>
+				<label class="field">
+					<span class="field-label">Длительность сессии</span>
+					<input id="cfgSessionDuration" type="text" placeholder="00:00:10">
+				</label>
+			</div>
+
+			<div class="actions config-actions">
+				<button id="toggleDevicesBtn" class="btn btn-secondary" type="button">Устройства</button>
+				<button id="configReloadBtn" class="btn btn-secondary" type="button">Обновить</button>
+				<button id="configSaveBtn" class="btn btn-primary" type="button">Сохранить и перезапустить</button>
+			</div>
+
+			<div id="serialsPanel" class="serials-panel" hidden>
+				<div class="card-head serials-panel-head">
+					<h3 class="config-section-title">Серийные номера</h3>
+					<span class="chart-hint" id="serialsLineCount">—</span>
+				</div>
+				<label class="field">
+					<span class="field-label">deviceserials.txt — по одному номеру на строку</span>
+					<textarea id="serialsContent" class="serials-textarea" spellcheck="false"></textarea>
+				</label>
+				<div class="actions config-actions">
+					<button id="serialsReloadBtn" class="btn btn-secondary" type="button">Обновить</button>
+					<button id="serialsSaveBtn" class="btn btn-primary" type="button">Сохранить и перезапустить</button>
+				</div>
 			</div>
 		</section>
 
@@ -42,15 +91,6 @@
 			</div>
 			<div class="chart" id="packetsChart" aria-label="График пакетов за 60 минут">
 				<p class="chart-empty">Подключите токен для загрузки графика</p>
-			</div>
-		</section>
-
-		<section class="card">
-			<div class="actions">
-				<button id="statusBtn" class="btn" type="button">Статус</button>
-				<button id="startBtn" class="btn btn-success" type="button">Запуск</button>
-				<button id="stopBtn" class="btn btn-danger" type="button">Остановка</button>
-				<button id="deployBtn" class="btn btn-primary" type="button">Деплой</button>
 			</div>
 		</section>
 
