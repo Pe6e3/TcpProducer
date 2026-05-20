@@ -77,6 +77,16 @@ body {
 	color: var(--accent);
 }
 
+.packet-counter-muted {
+	background: #243044;
+	border-color: var(--border);
+}
+
+.packet-counter-muted .packet-counter-value {
+	color: var(--text);
+	font-size: 1.1rem;
+}
+
 .status-badge {
 	padding: 8px 14px;
 	border-radius: 999px;
@@ -200,6 +210,74 @@ input:focus {
 .card-head h2 {
 	margin: 0;
 	font-size: 1rem;
+}
+
+.chart-hint {
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.chart {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 8px 10px;
+	background: #0b1220;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	overflow-x: auto;
+}
+
+.chart-bars {
+	display: flex;
+	align-items: flex-end;
+	gap: 3px;
+	height: 180px;
+	min-width: 100%;
+}
+
+.chart-empty {
+	margin: auto;
+	color: var(--muted);
+	font-size: 0.875rem;
+}
+
+.chart-bar-wrap {
+	flex: 1 1 0;
+	min-width: 6px;
+	max-width: 14px;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	align-items: center;
+}
+
+.chart-bar {
+	width: 100%;
+	min-height: 2px;
+	border-radius: 3px 3px 0 0;
+	background: linear-gradient(180deg, #60a5fa 0%, var(--accent) 100%);
+	transition: height 0.25s ease;
+}
+
+.chart-bar-wrap:hover .chart-bar {
+	background: linear-gradient(180deg, #93c5fd 0%, #60a5fa 100%);
+}
+
+.chart-axis {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 4px;
+	padding: 0 2px;
+	min-width: 100%;
+}
+
+.chart-axis-label {
+	font-size: 0.65rem;
+	color: var(--muted);
+	white-space: nowrap;
 }
 
 .output {

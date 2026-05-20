@@ -21,6 +21,8 @@ const output = document.getElementById('output');
 const logsOutput = document.getElementById('logsOutput');
 const statusBadge = document.getElementById('statusBadge');
 const packetCount = document.getElementById('packetCount');
+const packetCount60 = document.getElementById('packetCount60');
+const packetsChart = document.getElementById('packetsChart');
 
 let logsAbortController = null;
 let statsAbortController = null;
@@ -97,11 +99,56 @@ function formatPacketCount(value) {
 	return new Intl.NumberFormat('ru-RU').format(value);
 }
 
+function renderPacketsChart(timeline) {
+	if (!timeline?.length) {
+		packetsChart.innerHTML = '<p class="chart-empty">Нет данных за последние 60 минут</p>';
+		return;
+	}
+
+	const max = Math.max(1, ...timeline.map((p) => p.count ?? 0));
+	const lastIndex = timeline.length - 1;
+	const axisIndexes = [0, 10, 20, 30, 40, 50, lastIndex].filter(
+		(idx, pos, arr) => idx <= lastIndex && arr.indexOf(idx) === pos,
+	);
+
+	const bars = timeline
+		.map((point) => {
+			const count = point.count ?? 0;
+			const height = Math.round((count / max) * 100);
+			const label = point.label || '';
+			return `<div class="chart-bar-wrap" title="${label}: ${formatPacketCount(count)} пакетов">
+				<div class="chart-bar" style="height:${height}%"></div>
+			</div>`;
+		})
+		.join('');
+
+	const axis = axisIndexes
+		.map((idx) => `<span class="chart-axis-label">${timeline[idx].label}</span>`)
+		.join('');
+
+	packetsChart.innerHTML = `<div class="chart-bars">${bars}</div><div class="chart-axis">${axis}</div>`;
+}
+
 function applyStats(data) {
+	const updated = data.updatedAt
+		? new Date(data.updatedAt).toLocaleString('ru-RU')
+		: '—';
+	const unavailable = 'Сервис не запущен или stats.json ещё не создан';
+
+	packetCount60.textContent = formatPacketCount(data.last60Minutes ?? 0);
+	packetCount60.title = data.available
+		? `За 60 мин · обновлено: ${updated}`
+		: unavailable;
+
 	packetCount.textContent = formatPacketCount(data.totalSent ?? 0);
 	packetCount.title = data.available
-		? `Обновлено: ${data.updatedAt ? new Date(data.updatedAt).toLocaleString('ru-RU') : '—'}`
-		: 'Сервис не запущен или stats.json ещё не создан';
+		? `Всего · обновлено: ${updated}`
+		: unavailable;
+
+	if (data.available && data.timeline?.length)
+		renderPacketsChart(data.timeline);
+	else if (!data.available)
+		packetsChart.innerHTML = '<p class="chart-empty">Сервис не запущен</p>';
 }
 
 async function consumeSseStream(path, onEvent, signal) {
@@ -156,7 +203,9 @@ function stopStatsStream() {
 async function startStatsStream() {
 	const token = getToken();
 	if (!token) {
+		packetCount60.textContent = '—';
 		packetCount.textContent = '—';
+		packetsChart.innerHTML = '<p class="chart-empty">Подключите токен для загрузки графика</p>';
 		return;
 	}
 
@@ -176,8 +225,10 @@ async function startStatsStream() {
 			statsAbortController.signal,
 		);
 	} catch (err) {
-		if (err.name !== 'AbortError')
+		if (err.name !== 'AbortError') {
+			packetCount60.textContent = '—';
 			packetCount.textContent = '—';
+		}
 	} finally {
 		statsAbortController = null;
 	}

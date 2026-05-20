@@ -15,8 +15,12 @@
 				<p class="subtitle">Управление сервисом симулятора</p>
 			</div>
 			<div class="header-stats">
-				<div class="packet-counter" title="Отправлено TCP-пакетов (все устройства)">
-					<span class="packet-counter-label">Пакетов</span>
+				<div class="packet-counter" title="TCP-пакетов за последние 60 минут">
+					<span class="packet-counter-label">60 мин</span>
+					<span class="packet-counter-value" id="packetCount60">—</span>
+				</div>
+				<div class="packet-counter packet-counter-muted" title="Всего отправлено с запуска сервиса">
+					<span class="packet-counter-label">Всего</span>
 					<span class="packet-counter-value" id="packetCount">—</span>
 				</div>
 				<div class="status-badge" id="statusBadge">—</div>
@@ -28,6 +32,16 @@
 			<div class="token-row">
 				<input id="tokenInput" type="password" placeholder="ADMIN_API_TOKEN из .env" autocomplete="off">
 				<button id="saveTokenBtn" class="btn btn-secondary" type="button">Сохранить</button>
+			</div>
+		</section>
+
+		<section class="card">
+			<div class="card-head">
+				<h2>Пакеты по минутам</h2>
+				<span class="chart-hint">последние 60 мин</span>
+			</div>
+			<div class="chart" id="packetsChart" aria-label="График пакетов за 60 минут">
+				<p class="chart-empty">Подключите токен для загрузки графика</p>
 			</div>
 		</section>
 
