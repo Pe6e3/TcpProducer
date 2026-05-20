@@ -125,17 +125,20 @@ public sealed class SealWorker
 				await session.SendAsync(bytes, cancellationToken);
 			}
 
-			while (await _store.TryPeekTelemetryAsync(_serial, cancellationToken) is { } queued)
-			{
-				if (!await SendTelemetryBytesAsync(session, queued, sessionTimer, cancellationToken))
-					break;
-
-				await _store.TryDequeueTelemetryAsync(_serial, cancellationToken);
-			}
-
 			var dataMessage = _options.Protocol.AfterConnect.Message;
 			if (SealPayloadFactory.IsTelemetryConfigured(dataMessage))
 			{
+				var fresh = await _payloadFactory.CreateTelemetryAsync(_serial, cancellationToken);
+				await SendTelemetryBytesAsync(session, fresh, sessionTimer, cancellationToken, isFresh: true);
+
+				while (await _store.TryPeekTelemetryAsync(_serial, cancellationToken) is { } queued)
+				{
+					if (!await SendTelemetryBytesAsync(session, queued, sessionTimer, cancellationToken))
+						break;
+
+					await _store.TryDequeueTelemetryAsync(_serial, cancellationToken);
+				}
+
 				var nextPacketAt = DateTime.UtcNow + _packetInterval;
 
 				while (DateTime.UtcNow < sessionTimer.End && !cancellationToken.IsCancellationRequested)
@@ -186,7 +189,8 @@ public sealed class SealWorker
 		TcpSession session,
 		byte[] bytes,
 		SessionTimer sessionTimer,
-		CancellationToken cancellationToken)
+		CancellationToken cancellationToken,
+		bool isFresh = false)
 	{
 		var sentSerial = bytes[^1];
 		var ackTimeout = TimeSpan.FromSeconds(30);
@@ -194,12 +198,13 @@ public sealed class SealWorker
 
 		while (!cancellationToken.IsCancellationRequested && DateTime.UtcNow < sessionTimer.End)
 		{
-			var pendingInQueue = await _store.GetQueueLengthAsync(_serial, cancellationToken);
+			var backlogCount = await _store.GetQueueLengthAsync(_serial, cancellationToken);
 			_log(_serial, PacketLogFormatter.Outbound(
 				_options.Protocol.AfterConnect.Message,
 				bytes,
 				null,
-				pendingInQueue));
+				backlogCount,
+				isFresh));
 
 			await session.SendAsync(bytes, cancellationToken);
 

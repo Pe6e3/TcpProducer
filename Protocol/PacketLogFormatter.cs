@@ -9,13 +9,15 @@ public static class PacketLogFormatter
 		OutboundMessageOptions message,
 		byte[] bytes,
 		string? textPayload = null,
-		int pendingInQueue = 0)
+		int backlogCount = 0,
+		bool isFresh = false)
 	{
 		if (message.UsesTelemetryBuilder)
 		{
 			var serial = bytes.Length > 0 ? bytes[^1] : (byte)0;
-			var queueSuffix = pendingInQueue > 0 ? $" (+{pendingInQueue})" : "";
-			return $"→ telemetry s={serial}{queueSuffix}";
+			var freshTag = isFresh ? " свежий" : "";
+			var queueSuffix = backlogCount > 0 ? $" (очередь: {backlogCount})" : "";
+			return $"→ telemetry s={serial}{freshTag}{queueSuffix}";
 		}
 
 		var ascii = textPayload;
