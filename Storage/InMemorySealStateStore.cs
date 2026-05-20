@@ -52,6 +52,17 @@ public sealed class InMemorySealStateStore : ISealStateStore
 		return Task.CompletedTask;
 	}
 
+	public Task<byte[]?> TryPeekTelemetryAsync(string serialNumber, CancellationToken cancellationToken = default)
+	{
+		var entry = GetOrCreate(serialNumber);
+		lock (entry.Sync)
+		{
+			if (entry.Queue.Count == 0)
+				return Task.FromResult<byte[]?>(null);
+			return Task.FromResult<byte[]?>(entry.Queue.Peek().ToArray());
+		}
+	}
+
 	public Task<byte[]?> TryDequeueTelemetryAsync(string serialNumber, CancellationToken cancellationToken = default)
 	{
 		var entry = GetOrCreate(serialNumber);

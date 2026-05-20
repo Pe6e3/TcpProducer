@@ -125,10 +125,12 @@ public sealed class SealWorker
 				await session.SendAsync(bytes, cancellationToken);
 			}
 
-			while (await _store.TryDequeueTelemetryAsync(_serial, cancellationToken) is { } queued)
+			while (await _store.TryPeekTelemetryAsync(_serial, cancellationToken) is { } queued)
 			{
 				if (!await SendTelemetryBytesAsync(session, queued, sessionTimer, cancellationToken))
 					break;
+
+				await _store.TryDequeueTelemetryAsync(_serial, cancellationToken);
 			}
 
 			var dataMessage = _options.Protocol.AfterConnect.Message;
@@ -212,7 +214,10 @@ public sealed class SealWorker
 				cancellationToken);
 
 			if (ackResult == TelemetryAckWaitResult.Valid)
+			{
+				PacketStats.RecordSent();
 				return true;
+			}
 
 			if (ackResult == TelemetryAckWaitResult.InvalidSerial)
 			{

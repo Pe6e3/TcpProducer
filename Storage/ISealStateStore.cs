@@ -9,6 +9,7 @@ public interface ISealStateStore
 	Task SetOnlineAsync(string serialNumber, bool isOnline, CancellationToken cancellationToken = default);
 	Task<byte> GetNextAckSerialAsync(string serialNumber, CancellationToken cancellationToken = default);
 	Task EnqueueTelemetryAsync(string serialNumber, byte[] packet, CancellationToken cancellationToken = default);
+	Task<byte[]?> TryPeekTelemetryAsync(string serialNumber, CancellationToken cancellationToken = default);
 	Task<byte[]?> TryDequeueTelemetryAsync(string serialNumber, CancellationToken cancellationToken = default);
 	Task<int> GetQueueLengthAsync(string serialNumber, CancellationToken cancellationToken = default);
 }

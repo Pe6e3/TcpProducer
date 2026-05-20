@@ -59,6 +59,14 @@ public sealed class RedisSealStateStore : ISealStateStore, IAsyncDisposable
 		await _db.ListRightPushAsync(QueueKey(serialNumber), Convert.ToBase64String(packet));
 	}
 
+	public async Task<byte[]?> TryPeekTelemetryAsync(string serialNumber, CancellationToken cancellationToken = default)
+	{
+		var value = await _db.ListGetByIndexAsync(QueueKey(serialNumber), 0);
+		if (value.IsNullOrEmpty)
+			return null;
+		return Convert.FromBase64String(value.ToString());
+	}
+
 	public async Task<byte[]?> TryDequeueTelemetryAsync(string serialNumber, CancellationToken cancellationToken = default)
 	{
 		var value = await _db.ListLeftPopAsync(QueueKey(serialNumber));
