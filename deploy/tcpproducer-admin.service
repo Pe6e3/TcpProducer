@@ -1,0 +1,19 @@
+[Unit]
+Description=TcpProducer Admin Panel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/TcpProducer/admin/publish
+ExecStart=/var/www/TcpProducer/admin/publish/TcpProducer.Admin
+Restart=always
+RestartSec=5
+Environment=ASPNETCORE_URLS=http://127.0.0.1:8770
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tcpproducer-admin
+
+[Install]
+WantedBy=multi-user.target

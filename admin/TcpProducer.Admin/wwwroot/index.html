@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>TcpProducer Admin</title>
+	<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+	<div class="page">
+		<header class="header">
+			<div>
+				<h1>TcpProducer</h1>
+				<p class="subtitle">Управление сервисом симулятора</p>
+			</div>
+			<div class="status-badge" id="statusBadge">—</div>
+		</header>
+
+		<section class="card">
+			<label class="label" for="tokenInput">API-токен</label>
+			<div class="token-row">
+				<input id="tokenInput" type="password" placeholder="ADMIN_API_TOKEN из .env" autocomplete="off">
+				<button id="saveTokenBtn" class="btn btn-secondary" type="button">Сохранить</button>
+			</div>
+		</section>
+
+		<section class="card">
+			<div class="actions">
+				<button id="statusBtn" class="btn" type="button">Статус</button>
+				<button id="startBtn" class="btn btn-success" type="button">Запуск</button>
+				<button id="stopBtn" class="btn btn-danger" type="button">Остановка</button>
+				<button id="deployBtn" class="btn btn-primary" type="button">Деплой</button>
+			</div>
+		</section>
+
+		<section class="card">
+			<div class="card-head">
+				<h2>Вывод</h2>
+				<button id="clearBtn" class="btn btn-secondary btn-sm" type="button">Очистить</button>
+			</div>
+			<pre id="output" class="output">Готово.</pre>
+		</section>
+	</div>
+
+	<script src="app.js"></script>
+</body>
+</html>

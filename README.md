@@ -6,7 +6,7 @@
 
 | Источник | Назначение |
 |----------|------------|
-| `.env` | TCP: хост, порт, `AppendNewline` |
+| `.env` | TCP: хост, порт, `AppendNewline`, `ADMIN_API_TOKEN` |
 | `appsettings.json` | Протокол, телеметрия, storage, интервалы |
 | `deviceserials.txt` | Серийные номера устройств |
 
@@ -32,6 +32,35 @@ git pull
 dotnet publish -c Release -o /var/www/TcpProducer/publish
 cp /var/www/TcpProducer/.env /var/www/TcpProducer/publish/.env
 systemctl restart tcpproducer
+```
+
+## Панель управления
+
+Веб-клиент: **https://антон.su/tcp/**
+
+Первый запуск панели:
+
+```bash
+cd /var/www/TcpProducer
+dotnet publish admin/TcpProducer.Admin -c Release -o /var/www/TcpProducer/admin/publish
+cp deploy/tcpproducer-admin.service /etc/systemd/system/
+# Добавить location /tcp/ в /etc/nginx/sites-available/logexplain
+# (фрагмент: deploy/nginx-logexplain-tcpproducer.conf)
+systemctl daemon-reload
+systemctl enable --now tcpproducer-admin
+nginx -t && systemctl reload nginx
+```
+
+SSL-сертификат Let's Encrypt для домена уже настроен (`certbot certificates`).
+Продление: `certbot renew --dry-run`
+
+В `.env` задайте `ADMIN_API_TOKEN` — его нужно ввести в панели при первом открытии.
+
+Обновление панели после изменений:
+
+```bash
+dotnet publish admin/TcpProducer.Admin -c Release -o /var/www/TcpProducer/admin/publish
+systemctl restart tcpproducer-admin
 ```
 
 

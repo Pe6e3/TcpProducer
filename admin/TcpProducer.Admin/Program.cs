@@ -1,0 +1,99 @@
+using System.Text.Json;
+
+namespace TcpProducer.Admin;
+
+public sealed class AdminAuthMiddleware(RequestDelegate next)
+{
+	public async Task InvokeAsync(HttpContext context)
+	{
+		if (IsPublicPath(context.Request.Path))
+		{
+			await next(context);
+			return;
+		}
+
+		if (!context.Request.Headers.TryGetValue("Authorization", out var header)
+			|| !header.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+		{
+			await WriteUnauthorized(context);
+			return;
+		}
+
+		var token = header.ToString()["Bearer ".Length..].Trim();
+		if (!string.Equals(token, AdminOptions.ApiToken, StringComparison.Ordinal))
+		{
+			await WriteUnauthorized(context);
+			return;
+		}
+
+		await next(context);
+	}
+
+	static bool IsPublicPath(PathString path) =>
+		path.StartsWithSegments("/api/health")
+		|| path == "/"
+		|| path.StartsWithSegments("/index.html")
+		|| path.StartsWithSegments("/app.js")
+		|| path.StartsWithSegments("/styles.css");
+
+	static Task WriteUnauthorized(HttpContext context)
+	{
+		context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+		return context.Response.WriteAsJsonAsync(new { error = "Unauthorized" });
+	}
+}
+
+public static class Program
+{
+	public static void Main(string[] args)
+	{
+		AdminOptions.Load();
+
+		var builder = WebApplication.CreateBuilder(args);
+		var app = builder.Build();
+
+		app.UseMiddleware<AdminAuthMiddleware>();
+		app.UseDefaultFiles();
+		app.UseStaticFiles();
+
+		app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
+
+		app.MapGet("/api/status", async (CancellationToken ct) =>
+		{
+			var status = await ServiceManager.GetStatusAsync(ct);
+			return Results.Ok(status);
+		});
+
+		app.MapPost("/api/start", async (CancellationToken ct) =>
+		{
+			var result = await ServiceManager.StartAsync(ct);
+			return Results.Json(new ActionResponse
+			{
+				Ok = result.ExitCode == 0,
+				Output = result.Output,
+			});
+		});
+
+		app.MapPost("/api/stop", async (CancellationToken ct) =>
+		{
+			var result = await ServiceManager.StopAsync(ct);
+			return Results.Json(new ActionResponse
+			{
+				Ok = result.ExitCode == 0,
+				Output = result.Output,
+			});
+		});
+
+		app.MapPost("/api/deploy", async (CancellationToken ct) =>
+		{
+			var result = await ServiceManager.DeployAsync(ct);
+			return Results.Json(new ActionResponse
+			{
+				Ok = result.ExitCode == 0,
+				Output = result.Output,
+			});
+		});
+
+		app.Run("http://127.0.0.1:8770");
+	}
+}
