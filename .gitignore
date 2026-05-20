@@ -28,3 +28,4 @@ Thumbs.db
 ## User-specific config (keep appsettings.json in repo if it's shared dev config)
 appsettings.*.json
 !appsettings.json
+.env
