@@ -40,3 +40,7 @@ systemctl restart tcpproducer
 journalctl -u tcpproducer -f
 ```
 
+## Остановка сервиса
+```bash
+systemctl stop  tcpproducer
+```
