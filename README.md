@@ -23,3 +23,20 @@ Tcp__AppendNewline=false
 ```bash
 dotnet run
 ```
+
+## Деплой
+
+```bash
+cd /var/www/TcpProducer
+git pull
+dotnet publish -c Release -o /var/www/TcpProducer/publish
+cp /var/www/TcpProducer/.env /var/www/TcpProducer/publish/.env
+systemctl restart tcpproducer
+```
+
+
+## Смотреть логи онлайн
+```bash
+journalctl -u tcpproducer -f
+```
+
